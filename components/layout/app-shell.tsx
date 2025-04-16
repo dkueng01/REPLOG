@@ -5,10 +5,19 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Dumbbell, Home, ListChecks, User, Menu } from "lucide-react"
+import { Dumbbell, Home, ListChecks, User, Menu, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useRouter } from "next/navigation"
+import { toast } from "@/components/ui/use-toast"
 
 interface NavItem {
   title: string
@@ -41,7 +50,16 @@ const navItems: NavItem[] = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
+
+  const handleLogout = () => {
+    toast({
+      title: "Logged out",
+      description: "You have been logged out successfully.",
+    })
+    router.push("/login")
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -76,6 +94,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     {item.title}
                   </Link>
                 ))}
+                <button
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-destructive hover:bg-muted"
+                >
+                  <LogOut className="h-5 w-5" />
+                  Logout
+                </button>
               </nav>
             </SheetContent>
           </Sheet>
@@ -83,6 +108,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Dumbbell className="h-5 w-5 text-orange-500" />
             <span>REPLOG</span>
           </Link>
+        </div>
+        <div className="flex items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 border">
+                <span className="font-semibold text-sm">FU</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href="/profile">Profile</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem>Settings</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
       <main className="flex-1 p-4">{children}</main>

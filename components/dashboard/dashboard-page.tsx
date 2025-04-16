@@ -8,6 +8,7 @@ import { userStats } from "@/mockedData/userStats"
 import { AppShell } from "@/components/layout/app-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { workouts } from "@/mockedData/workouts"
 
 export function DashboardPage() {
   const [greeting] = useState(() => {
@@ -17,7 +18,11 @@ export function DashboardPage() {
     return "Good evening"
   })
 
-  const lastWorkoutDate = new Date(userStats.lastWorkoutDate)
+  const [lastWorkoutDate] = useState(() => {
+    // Sort workouts by date (newest first) and get the most recent one
+    const sortedWorkouts = [...workouts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return sortedWorkouts.length > 0 ? new Date(sortedWorkouts[0].date) : new Date()
+  })
 
   return (
     <AppShell>

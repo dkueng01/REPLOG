@@ -1,7 +1,9 @@
 "use client"
 
-import { format } from "date-fns"
+import { format, subDays, isAfter, isSameDay } from "date-fns"
 import { userStats } from "@/mockedData/userStats"
+import { workouts } from "@/mockedData/workouts"
+import { exercises } from "@/mockedData/exercises"
 import { AppShell } from "@/components/layout/app-shell"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +12,145 @@ import { Dumbbell, Calendar, BarChart3 } from "lucide-react"
 
 export function ProfilePage() {
   const joinDate = new Date(userStats.joinDate)
-  const lastWorkoutDate = new Date(userStats.lastWorkoutDate)
+
+  // Calculate statistics from workout data
+  const calculateStats = () => {
+    // Sort workouts by date (newest first)
+    const sortedWorkouts = [...workouts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+    // Last workout date
+    const lastWorkoutDate = sortedWorkouts.length > 0 ? new Date(sortedWorkouts[0].date) : new Date()
+
+    // Total workouts
+    const totalWorkouts = workouts.length
+
+    // Total sets
+    const totalSets = workouts.reduce((total, workout) => {
+      return (
+        total +
+        workout.exercises.reduce((exerciseTotal, exercise) => {
+          return exerciseTotal + exercise.sets.length
+        }, 0)
+      )
+    }, 0)
+
+    // Total volume (weight × reps)
+    const totalVolume = workouts.reduce((total, workout) => {
+      return (
+        total +
+        workout.exercises.reduce((exerciseTotal, exercise) => {
+          return (
+            exerciseTotal +
+            exercise.sets.reduce((setTotal, set) => {
+              return setTotal + set.weight * set.reps
+            }, 0)
+          )
+        }, 0)
+      )
+    }, 0)
+
+    // Workouts this week (last 7 days)
+    const oneWeekAgo = subDays(new Date(), 7)
+    const workoutsThisWeek = workouts.filter((workout) => isAfter(new Date(workout.date), oneWeekAgo)).length
+
+    // Calculate streak (consecutive days with workouts)
+    const calculateStreak = () => {
+      if (sortedWorkouts.length === 0) return 0
+
+      // Get unique workout dates and sort them (newest first)
+      const workoutDates = [...new Set(sortedWorkouts.map((w) => format(new Date(w.date), "yyyy-MM-dd")))]
+        .map((dateStr) => new Date(dateStr))
+        .sort((a, b) => b.getTime() - a.getTime())
+
+      // If no workout today, streak is 0
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      if (
+        !workoutDates.some((date) => isSameDay(date, today)) &&
+        !workoutDates.some((date) => isSameDay(date, subDays(today, 1)))
+      ) {
+        return 0
+      }
+
+      let streak = 1
+      let currentDate = workoutDates[0]
+
+      for (let i = 1; i < workoutDates.length; i++) {
+        const expectedPrevDate = subDays(currentDate, 1)
+        if (isSameDay(expectedPrevDate, workoutDates[i])) {
+          streak++
+          currentDate = workoutDates[i]
+        } else {
+          break
+        }
+      }
+
+      return streak
+    }
+
+    const streak = calculateStreak()
+
+    // Find favorite exercise (most frequently performed)
+    const exerciseFrequency = {}
+    workouts.forEach((workout) => {
+      workout.exercises.forEach((exercise) => {
+        exerciseFrequency[exercise.exerciseId] = (exerciseFrequency[exercise.exerciseId] || 0) + 1
+      })
+    })
+
+    let favoriteExerciseId = null
+    let maxFrequency = 0
+
+    Object.entries(exerciseFrequency).forEach(([exerciseId, frequency]) => {
+      if (frequency > maxFrequency) {
+        favoriteExerciseId = exerciseId
+        maxFrequency = frequency
+      }
+    })
+
+    const favoriteExercise = favoriteExerciseId
+      ? exercises.find((ex) => ex.id === favoriteExerciseId)?.name || "Unknown"
+      : "None"
+
+    // Calculate personal bests (max weight for each exercise)
+    const personalBests = {}
+
+    workouts.forEach((workout) => {
+      workout.exercises.forEach((exercise) => {
+        const maxWeightSet = exercise.sets.reduce((max, set) => (set.weight > max ? set.weight : max), 0)
+
+        if (!personalBests[exercise.exerciseId] || maxWeightSet > personalBests[exercise.exerciseId]) {
+          personalBests[exercise.exerciseId] = maxWeightSet
+        }
+      })
+    })
+
+    // Get last workout plan name
+    const lastWorkoutPlanId = sortedWorkouts.length > 0 ? sortedWorkouts[0].planId : null
+    const lastWorkoutPlanName =
+      lastWorkoutPlanId === "plan1"
+        ? "Push Day"
+        : lastWorkoutPlanId === "plan2"
+          ? "Pull Day"
+          : lastWorkoutPlanId === "plan3"
+            ? "Leg Day"
+            : "Unknown"
+
+    return {
+      totalWorkouts,
+      totalSets,
+      totalVolume,
+      workoutsThisWeek,
+      lastWorkoutDate,
+      streak,
+      favoriteExercise,
+      personalBests,
+      lastWorkoutPlanName,
+    }
+  }
+
+  const stats = calculateStats()
 
   return (
     <AppShell>
@@ -44,36 +184,29 @@ export function ProfilePage() {
                   <div className="flex flex-col items-center gap-1 rounded-lg border p-3">
                     <Dumbbell className="h-5 w-5 text-orange-500" />
                     <span className="text-xs text-muted-foreground">Total Workouts</span>
-                    <span className="text-xl font-bold">{userStats.totalWorkouts}</span>
+                    <span className="text-xl font-bold">{stats.totalWorkouts}</span>
                   </div>
                   <div className="flex flex-col items-center gap-1 rounded-lg border p-3">
                     <BarChart3 className="h-5 w-5 text-orange-500" />
                     <span className="text-xs text-muted-foreground">Total Volume</span>
-                    <span className="text-xl font-bold">{userStats.totalVolume.toLocaleString()} lbs</span>
+                    <span className="text-xl font-bold">{stats.totalVolume.toLocaleString()} kg</span>
                   </div>
                   <div className="flex flex-col items-center gap-1 rounded-lg border p-3">
                     <Calendar className="h-5 w-5 text-orange-500" />
                     <span className="text-xs text-muted-foreground">Current Streak</span>
-                    <span className="text-xl font-bold">{userStats.streak} days</span>
+                    <span className="text-xl font-bold">{stats.streak} days</span>
                   </div>
                 </div>
 
                 <div>
                   <h3 className="mb-3 text-lg font-medium">Personal Bests</h3>
                   <div className="space-y-2">
-                    {Object.entries(userStats.personalBests).map(([exerciseId, weight]) => {
-                      const exerciseName =
-                        exerciseId === "ex1"
-                          ? "Bench Press"
-                          : exerciseId === "ex3"
-                            ? "Squats"
-                            : exerciseId === "ex7"
-                              ? "Deadlift"
-                              : "Unknown"
+                    {Object.entries(stats.personalBests).map(([exerciseId, weight]) => {
+                      const exerciseName = exercises.find((ex) => ex.id === exerciseId)?.name || "Unknown"
                       return (
                         <div key={exerciseId} className="flex items-center justify-between rounded-md border px-3 py-2">
                           <span>{exerciseName}</span>
-                          <span className="font-medium">{weight} lbs</span>
+                          <span className="font-medium">{weight} kg</span>
                         </div>
                       )
                     })}
@@ -83,8 +216,8 @@ export function ProfilePage() {
                 <div>
                   <h3 className="mb-3 text-lg font-medium">Recent Activity</h3>
                   <div className="rounded-md border px-3 py-2">
-                    <p className="text-sm">Last workout: {format(lastWorkoutDate, "MMMM d, yyyy")}</p>
-                    <p className="text-sm text-muted-foreground">Pull Day</p>
+                    <p className="text-sm">Last workout: {format(stats.lastWorkoutDate, "MMMM d, yyyy")}</p>
+                    <p className="text-sm text-muted-foreground">{stats.lastWorkoutPlanName}</p>
                   </div>
                 </div>
               </CardContent>
